@@ -4,7 +4,7 @@
 
 A single-file dashboard that screens community and regional banks for rising nonperforming loan concentrations using publicly filed regulatory data. Built to identify which institutions are likely approaching loan disposition decisions — before those assets hit the market.
 
-**Live Dashboard:** `https://YOUR_USERNAME.github.io/bank-npl-monitor/`
+**Live Dashboard:** `https://dheerajag01.github.io/Bank-NPL-Monitor/`
 
 ---
 

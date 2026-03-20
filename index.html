@@ -103,7 +103,7 @@ const {useState,useEffect,useMemo,useCallback} = React;
 
 // ── Config ──
 const FDIC = "https://banks.data.fdic.gov/api";
-const FIELDS = "CERT,REPDTE,INSTNAME,CITY,STALP,ASSET,LNLSNET,NCLNLS,NCLNLSR,NTLNLSR,ELNATR,EQTOT,ORE,LNATRES,DEP,INTINC,NITEFULL,NETINC,ROA,ROE,IDT1RWA,RBCRWAJ,P3ASSET,P9ASSET,LNLSDEPR";
+const FIELDS = "CERT,REPDTE,INSTNAME,REPNM,CITY,STALP,ASSET,LNLSNET,NCLNLS,NCLNLSR,NTLNLSR,ELNATR,EQTOT,ORE,LNATRES,DEP,INTINC,NITEFULL,NETINC,ROA,ROE,IDT1RWA,RBCRWAJ,P3ASSET,P9ASSET,LNLSDEPR";
 const DATES = ["20240930","20240630","20240331","20231231","20230930","20230630","20230331","20221231"];
 const QLBL = ["Q3 2024","Q2 2024","Q1 2024","Q4 2023","Q3 2023","Q2 2023","Q1 2023","Q4 2022"];
 const STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
@@ -315,8 +315,22 @@ function App(){
       const insts=(j.data||[]).map(x=>x.data);
       setProg(30);setPhase(`Found ${j.totals?.count||insts.length} banks. Loading history...`);
       if(!insts.length){setBanks([]);setLoading(false);return;}
+      // Fetch institution names from the institutions endpoint
       const bm={};
-      insts.forEach(i=>{bm[i.CERT]={cert:i.CERT,nm:i.INSTNAME,ct:i.CITY,st:i.STALP,as:i.ASSET,roe:i.ROE,roa:i.ROA,t1:i.IDT1RWA||i.RBCRWAJ,q:[parseQ(i)]};});
+      const certList=insts.map(i=>i.CERT);
+      const nameMap={};
+      for(let bi=0;bi<certList.length;bi+=25){
+        const batch=certList.slice(bi,bi+25);
+        const cf=batch.map(c=>`CERT:${c}`).join(" OR ");
+        try{
+          const nr=await fetch(`${FDIC}/institutions?filters=(${cf})&fields=CERT,INSTNAME,NAME,CITY,STALP&limit=25`);
+          if(nr.ok){const nj=await nr.json();(nj.data||[]).forEach(x=>{const d=x.data;nameMap[d.CERT]=d.INSTNAME||d.NAME||"";});}
+        }catch{}
+      }
+      insts.forEach(i=>{
+        const bankName=nameMap[i.CERT]||i.INSTNAME||i.REPNM||("Bank #"+i.CERT);
+        bm[i.CERT]={cert:i.CERT,nm:bankName,ct:i.CITY||"",st:i.STALP||"",as:i.ASSET,roe:i.ROE,roa:i.ROA,t1:i.IDT1RWA||i.RBCRWAJ,q:[parseQ(i)]};
+      });
       const certs=insts.map(i=>i.CERT);
       for(let qi=1;qi<DATES.length;qi++){
         for(let bi=0;bi<certs.length;bi+=25){

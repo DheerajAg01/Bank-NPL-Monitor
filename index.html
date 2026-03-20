@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Bank NPL Concentration Monitor — FDIC Live Data</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f5f5;color:#111}
+.app{max-width:1300px;margin:0 auto;padding:16px}
+.header{margin-bottom:20px;border-bottom:1px solid #e5e7eb;padding-bottom:16px}
+.header-row{display:flex;align-items:center;gap:10px}
+.header-bar{width:8px;height:28px;background:#dc2626;border-radius:2px}
+.header h1{font-size:24px;font-weight:800}
+.header p{margin:4px 0 0 18px;font-size:13px;color:#6b7280}
+.controls{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin-bottom:16px}
+.controls-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.ctrl-group label{font-size:10px;color:#6b7280;display:block;margin-bottom:3px}
+.ctrl-group select,.ctrl-group input{padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px}
+.ctrl-group select{min-width:80px}
+.btn{padding:7px 20px;background:#1e40af;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer}
+.btn:hover{background:#1e3a8a}
+.btn:disabled{background:#9ca3af;cursor:wait}
+.loading-box{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px;margin-bottom:16px}
+.load-header{display:flex;justify-content:space-between;font-size:11px;color:#6b7280;margin-bottom:4px}
+.load-track{width:100%;height:4px;background:#e5e7eb;border-radius:2px;overflow:hidden}
+.load-fill{height:100%;background:#3b82f6;border-radius:2px;transition:width .3s}
+.load-sub{font-size:11px;color:#9ca3af;margin-top:6px}
+.error-box{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px;margin-bottom:16px;font-size:12px;color:#991b1b}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.stat-card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px}
+.stat-label{font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;font-weight:500}
+.stat-value{font-size:22px;font-weight:800;margin-top:2px}
+.filters-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+.filters-row input,.filters-row select{padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px}
+.filters-row .count{font-size:11px;color:#9ca3af;margin-left:auto}
+.table-wrap{overflow-x:auto;border:1px solid #e5e7eb;border-radius:10px;background:#fff;max-height:520px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;min-width:1050px}
+thead th{padding:8px 10px;font-size:11px;text-align:left;cursor:pointer;user-select:none;white-space:nowrap;border-bottom:2px solid #e5e7eb;font-weight:600;color:#374151;background:#f9fafb;position:sticky;top:0;z-index:1}
+tbody td{padding:8px 10px;font-size:12px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
+tbody tr{cursor:pointer;transition:background .15s}
+tbody tr:hover{background:#f9fafb}
+tbody tr.selected{background:#eff6ff}
+.badge{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;display:inline-block}
+.badge-critical{background:#dc2626;color:#fff}
+.badge-stress{background:#f59e0b;color:#000}
+.badge-watch{background:#3b82f6;color:#fff}
+.badge-ok{background:#22c55e;color:#fff}
+.badge-na{background:#9ca3af;color:#fff}
+.score-bar{display:flex;align-items:center;gap:6px}
+.score-track{width:60px;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden}
+.score-fill{height:100%;border-radius:3px;transition:width .5s}
+.score-num{font-size:12px;font-weight:700;min-width:20px}
+.detail{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:24px;margin-top:12px;box-shadow:0 4px 12px rgba(0,0,0,.06)}
+.detail-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+.detail-header h3{font-size:20px;font-weight:700}
+.detail-header p{margin:4px 0 0;font-size:13px;color:#6b7280}
+.detail-close{background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af}
+.detail-badges{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.detail-badges .tag{background:#f3f4f6;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:500}
+.metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:20px}
+.metric-card{background:#f9fafb;border-radius:8px;padding:14px;border:1px solid #f3f4f6}
+.metric-label{font-size:11px;color:#6b7280;margin-bottom:6px;font-weight:500}
+.metric-row{display:flex;align-items:center;justify-content:space-between}
+.metric-val{font-size:22px;font-weight:700}
+.metric-delta{font-size:11px;margin-left:6px;font-weight:600}
+.bars-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.bar-chart{background:#f9fafb;border-radius:8px;padding:14px}
+.bar-chart-title{font-size:12px;font-weight:600;margin-bottom:8px}
+.bar-row{display:flex;gap:2px;align-items:flex-end;height:60px}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}
+.bar-val{font-size:8px;color:#9ca3af}
+.bar-fill{width:100%;border-radius:2px}
+.bar-label{font-size:7px;color:#9ca3af}
+.signals-box{background:#fef2f2;border-radius:8px;padding:14px;margin-bottom:16px}
+.signals-title{font-size:12px;font-weight:600;color:#991b1b;margin-bottom:8px}
+.signals-list{display:flex;flex-wrap:wrap;gap:6px}
+.signal-tag{padding:3px 10px;border-radius:4px;font-size:11px;font-weight:500}
+.signal-critical{background:#fecaca;color:#991b1b}
+.signal-warning{background:#fef3c7;color:#92400e}
+.signal-info{background:#dbeafe;color:#1e40af}
+.playbook{padding:14px;background:#eff6ff;border-radius:8px}
+.playbook-title{font-size:13px;font-weight:700;color:#1e40af;margin-bottom:6px}
+.playbook-body{font-size:12px;color:#1e3a5f;line-height:1.7}
+.playbook-body p{margin:0 0 6px}
+.footer{margin-top:16px;padding:14px;background:#f9fafb;border-radius:8px;font-size:11px;color:#6b7280;line-height:1.7}
+.empty{text-align:center;padding:40px;color:#9ca3af}
+.empty-icon{font-size:36px;margin-bottom:8px}
+.empty-text{font-size:14px;font-weight:500}
+@media(max-width:768px){
+  .bars-grid{grid-template-columns:1fr}
+  .metrics-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<script type="text/babel">
+const {useState,useEffect,useMemo,useCallback} = React;
+
+// ── Config ──
+const FDIC = "https://banks.data.fdic.gov/api";
+const FIELDS = "CERT,REPDTE,INSTNAME,CITY,STALP,ASSET,LNLSNET,NCLNLS,NCLNLSR,NTLNLSR,ELNATR,EQTOT,ORE,LNATRES,DEP,INTINC,NITEFULL,NETINC,ROA,ROE,IDT1RWA,RBCRWAJ,P3ASSET,P9ASSET,LNLSDEPR";
+const DATES = ["20240930","20240630","20240331","20231231","20230930","20230630","20230331","20221231"];
+const QLBL = ["Q3 2024","Q2 2024","Q1 2024","Q4 2023","Q3 2023","Q2 2023","Q1 2023","Q4 2022"];
+const STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
+const SIZES = {
+  community:{label:"Community Banks (<$1B)",min:"0",max:"1000000"},
+  small_regional:{label:"Small Regional ($1B–$10B)",min:"1000000",max:"10000000"},
+  regional:{label:"Regional ($10B–$50B)",min:"10000000",max:"50000000"},
+  custom:{label:"Custom Range",min:"0",max:"100000000"}
+};
+
+// ── Helpers ──
+const fm = (n,d=2)=>n==null||isNaN(n)?"—":Number(n).toFixed(d);
+const fB = n=>{if(n==null||isNaN(n))return"—";const v=n/1e6;return v>=1?`$${v.toFixed(1)}B`:`$${(n/1e3).toFixed(0)}M`;};
+const fP = n=>n==null||isNaN(n)?"—":`${Number(n).toFixed(2)}%`;
+
+function parseQ(d){
+  return{
+    date:d.REPDTE,
+    npaR:d.NCLNLSR||(d.NCLNLS&&d.ASSET?(d.NCLNLS/d.ASSET)*100:null),
+    ncoR:d.NTLNLSR||0,
+    provR:d.ELNATR||0,
+    classR:d.P3ASSET!=null&&d.P9ASSET!=null&&d.EQTOT?((d.P3ASSET+d.P9ASSET)/(d.EQTOT||1))*100:(d.NCLNLSR||0)*1.4,
+    texR:d.NCLNLS!=null&&d.ORE!=null&&d.EQTOT!=null&&d.LNATRES!=null?((d.NCLNLS+(d.ORE||0))/((d.EQTOT||1)+(d.LNATRES||0)))*100:null,
+    covR:d.LNATRES&&d.NCLNLS?(d.LNATRES/(d.NCLNLS||1))*100:null,
+    ore:d.ORE,nclnls:d.NCLNLS
+  };
+}
+
+function score(bank){
+  const d=bank.q||[];
+  if(!d.length)return{s:0,sig:[],ph:"No Data",dNPA:null,yNPA:null,dNCO:null};
+  const L=d[0],P=d[1]||{},Y=d[4]||{};
+  const npa=L.npaR||0,nco=L.ncoR||0,cl=L.classR||0,tx=L.texR||0,pv=L.provR||0;
+  const dNPA=P.npaR!=null?L.npaR-P.npaR:null;
+  const yNPA=Y.npaR!=null?L.npaR-Y.npaR:null;
+  const dNCO=P.ncoR!=null?L.ncoR-P.ncoR:null;
+  const sig=[];
+  if(npa>5)sig.push({t:"critical",x:"NPA ratio severely stressed (>5%)"});
+  else if(npa>3)sig.push({t:"critical",x:"NPA ratio elevated (>3%)"});
+  if(dNPA>0.4)sig.push({t:"warning",x:`NPA rising +${fm(dNPA)}% QoQ`});
+  if(yNPA>1)sig.push({t:"critical",x:`NPA up +${fm(yNPA)}% YoY`});
+  if(nco>1.5)sig.push({t:"critical",x:"NCOs severe (>150bps)"});
+  else if(nco>0.8)sig.push({t:"warning",x:"NCOs elevated (>80bps)"});
+  if(dNCO>0.15)sig.push({t:"warning",x:"Charge-offs accelerating"});
+  if(tx>100)sig.push({t:"critical",x:`Texas ratio ${fm(tx,0)}% — critical`});
+  else if(tx>50)sig.push({t:"warning",x:`Texas ratio ${fm(tx,0)}% — approaching critical`});
+  if(cl>8)sig.push({t:"warning",x:`Past-due/Capital >${fm(cl,0)}%`});
+  if(pv>nco*1.1&&pv>0.3)sig.push({t:"info",x:"Provision build > charge-offs"});
+  let sc=0;
+  sc+=Math.min(npa*8,40);sc+=Math.min(Math.max(dNPA||0,0)*20,20);
+  sc+=Math.min(nco*12,15);sc+=Math.min(cl*1.2,15);sc+=Math.min(Math.max(tx-25,0)*0.25,10);
+  sc=Math.min(Math.round(sc),100);
+  let ph="Performing";
+  if(sc>=70)ph="Likely Selling / Workout Active";
+  else if(sc>=50)ph="Stress Emerging";
+  else if(sc>=30)ph="Early Watch";
+  return{s:sc,sig,ph,dNPA,yNPA,dNCO};
+}
+
+// ── Components ──
+function Spark({data,color,w=130,h=30}){
+  if(!data||data.length<2)return React.createElement("span",{style:{color:"#aaa",fontSize:10}},"—");
+  const v=data.filter(x=>x!=null&&!isNaN(x));
+  if(v.length<2)return React.createElement("span",{style:{color:"#aaa",fontSize:10}},"—");
+  const mn=Math.min(...v),mx=Math.max(...v),rng=mx-mn||1;
+  const pts=data.map((val,i)=>{
+    const y=val!=null?h-3-((val-mn)/rng)*(h-6):null;
+    return{x:3+(i/(data.length-1))*(w-6),y};
+  }).filter(p=>p.y!=null);
+  const ln=pts.map(p=>`${p.x},${p.y}`).join(" ");
+  return React.createElement("svg",{width:w,height:h,style:{display:"block"}},
+    React.createElement("polyline",{points:ln,fill:"none",stroke:color,strokeWidth:"1.5",strokeLinejoin:"round"}),
+    pts.map((p,i)=>React.createElement("circle",{key:i,cx:p.x,cy:p.y,r:i===0?2.5:1.5,fill:i===0?color:"transparent",stroke:color,strokeWidth:"1"}))
+  );
+}
+
+function Badge({phase,small}){
+  const cls=phase.includes("Selling")?"badge-critical":phase.includes("Stress")?"badge-stress":phase.includes("Watch")?"badge-watch":phase==="Performing"?"badge-ok":"badge-na";
+  return React.createElement("span",{className:`badge ${cls}`,style:small?{fontSize:10,padding:"1px 6px"}:null},phase);
+}
+
+function ScoreBar({sc}){
+  const c=sc>=70?"#dc2626":sc>=50?"#f59e0b":sc>=30?"#3b82f6":"#22c55e";
+  return React.createElement("div",{className:"score-bar"},
+    React.createElement("div",{className:"score-track"},
+      React.createElement("div",{className:"score-fill",style:{width:`${sc}%`,background:c}})
+    ),
+    React.createElement("span",{className:"score-num",style:{color:c}},sc)
+  );
+}
+
+function Detail({bank,onClose}){
+  const d=bank.q||[];const L=d[0]||{};const ds=bank.ds;
+  const metrics=[
+    {l:"NPA / Total Assets",data:d.map(q=>q.npaR),c:"#dc2626",v:L.npaR,tr:ds.dNPA},
+    {l:"Net Charge-Offs / Avg Loans",data:d.map(q=>q.ncoR),c:"#f59e0b",v:L.ncoR,tr:ds.dNCO},
+    {l:"Past Due / Capital",data:d.map(q=>q.classR),c:"#8b5cf6",v:L.classR},
+    {l:"Texas Ratio",data:d.map(q=>q.texR),c:"#ec4899",v:L.texR},
+    {l:"Provision / Avg Loans",data:d.map(q=>q.provR),c:"#06b6d4",v:L.provR},
+    {l:"ALLL Coverage",data:d.map(q=>q.covR),c:"#10b981",v:L.covR},
+  ];
+  function BarChart({data,title}){
+    const mx=Math.max(...data.map(v=>v||0),0.5);
+    return React.createElement("div",{className:"bar-chart"},
+      React.createElement("div",{className:"bar-chart-title"},title),
+      React.createElement("div",{className:"bar-row"},
+        data.slice().reverse().map((v,i)=>{
+          const val=v||0;const h=Math.max((val/mx)*50,2);
+          const c=val>5?"#dc2626":val>3?"#f59e0b":val>1.5?"#3b82f6":"#22c55e";
+          return React.createElement("div",{key:i,className:"bar-col"},
+            React.createElement("div",{className:"bar-val"},fm(val,1)),
+            React.createElement("div",{className:"bar-fill",style:{height:h,background:c}}),
+            React.createElement("div",{className:"bar-label"},QLBL[data.length-1-i]?.split(" ")[0])
+          );
+        })
+      )
+    );
+  }
+  const sc=ds.s;
+  return React.createElement("div",{className:"detail"},
+    React.createElement("div",{className:"detail-header"},
+      React.createElement("div",null,
+        React.createElement("h3",null,bank.nm),
+        React.createElement("p",null,`${bank.ct}, ${bank.st} · FDIC Cert #${bank.cert} · ${fB(bank.as)} Assets`)
+      ),
+      React.createElement("button",{className:"detail-close",onClick:onClose},"✕")
+    ),
+    React.createElement("div",{className:"detail-badges"},
+      React.createElement(Badge,{phase:ds.ph}),
+      React.createElement("span",{className:"tag"},`Distress Score: ${sc}/100`),
+      bank.roe!=null&&React.createElement("span",{className:"tag"},`ROE: ${fm(bank.roe)}%`),
+      bank.roa!=null&&React.createElement("span",{className:"tag"},`ROA: ${fm(bank.roa)}%`),
+      bank.t1!=null&&React.createElement("span",{className:"tag"},`Tier 1: ${fm(bank.t1)}%`)
+    ),
+    React.createElement("div",{className:"metrics-grid"},
+      metrics.map(m=>React.createElement("div",{key:m.l,className:"metric-card"},
+        React.createElement("div",{className:"metric-label"},m.l),
+        React.createElement("div",{className:"metric-row"},
+          React.createElement("div",null,
+            React.createElement("span",{className:"metric-val",style:{color:m.c}},fm(m.v),"%"),
+            m.tr!=null&&React.createElement("span",{className:"metric-delta",style:{color:m.tr>0?"#dc2626":"#22c55e"}},`${m.tr>0?"+":""}${fm(m.tr)}%`)
+          ),
+          React.createElement(Spark,{data:m.data,color:m.c})
+        )
+      ))
+    ),
+    React.createElement("div",{className:"bars-grid"},
+      React.createElement(BarChart,{data:d.map(q=>q.npaR),title:"8-Quarter NPA Trend"}),
+      React.createElement(BarChart,{data:d.map(q=>q.ncoR),title:"8-Quarter NCO Trend"})
+    ),
+    ds.sig.length>0&&React.createElement("div",{className:"signals-box"},
+      React.createElement("div",{className:"signals-title"},`Active Signals (${ds.sig.length})`),
+      React.createElement("div",{className:"signals-list"},
+        ds.sig.map((s,i)=>React.createElement("span",{key:i,className:`signal-tag signal-${s.t}`},
+          `${s.t==="critical"?"🔴":s.t==="warning"?"🟡":"🔵"} ${s.x}`
+        ))
+      )
+    ),
+    React.createElement("div",{className:"playbook"},
+      React.createElement("div",{className:"playbook-title"},"Sourcing Playbook"),
+      React.createElement("div",{className:"playbook-body"},
+        sc>=70&&React.createElement(React.Fragment,null,
+          React.createElement("p",null,React.createElement("strong",null,"Phase: Active Workout / Likely Selling")),
+          React.createElement("p",null,`High probability of active special assets desk. NPA ratio ${fP(L.npaR)}, Texas ratio ${fm(L.texR,0)}%. Regulatory pressure likely driving disposition.`),
+          React.createElement("p",null,React.createElement("strong",null,"Targets: "),"SVP Special Assets, Chief Credit Officer. ",React.createElement("strong",null,"Approach: "),"Reference public call report deterioration. Check OREO (",fB(L.ore),") for REO acquisition opportunities.")
+        ),
+        sc>=50&&sc<70&&React.createElement(React.Fragment,null,
+          React.createElement("p",null,React.createElement("strong",null,"Phase: Stress Emerging — Pre-Disposition Window")),
+          React.createElement("p",null,"Internal credit committee discussions likely underway. Optimal relationship-building window."),
+          React.createElement("p",null,React.createElement("strong",null,"Targets: "),"Chief Lending Officer, Credit Admin. ",React.createElement("strong",null,"Approach: "),"Offer portfolio review, provide LOI framework. Monitor next quarter for acceleration.")
+        ),
+        sc>=30&&sc<50&&React.createElement(React.Fragment,null,
+          React.createElement("p",null,React.createElement("strong",null,"Phase: Early Watch — Relationship Development")),
+          React.createElement("p",null,"Deterioration signals emerging but not at decision stage. If trends continue, selling window in 2–3 quarters. Begin outreach now for first-mover positioning.")
+        ),
+        sc<30&&React.createElement("p",null,"Well-managed portfolio. Low priority for distressed sourcing. Continue quarterly monitoring.")
+      )
+    )
+  );
+}
+
+// ── Main App ──
+function App(){
+  const [banks,setBanks]=useState([]);
+  const [loading,setLoading]=useState(false);
+  const [phase,setPhase]=useState("");
+  const [prog,setProg]=useState(0);
+  const [err,setErr]=useState(null);
+  const [sortC,setSortC]=useState("score");
+  const [sortD,setSortD]=useState("desc");
+  const [phF,setPhF]=useState("All");
+  const [stF,setStF]=useState("All");
+  const [szF,setSzF]=useState("community");
+  const [sel,setSel]=useState(null);
+  const [srch,setSrch]=useState("");
+  const [cMin,setCMin]=useState("0");
+  const [cMax,setCMax]=useState("100000000");
+
+  const run=useCallback(async()=>{
+    setLoading(true);setErr(null);setPhase("Querying FDIC...");setProg(10);
+    try{
+      const sz=SIZES[szF];
+      const mn=szF==="custom"?cMin:sz.min;
+      const mx=szF==="custom"?cMax:sz.max;
+      const sf=stF!=="All"?` AND STALP:${stF}`:"";
+      const url=`${FDIC}/financials?filters=REPDTE:${DATES[0]} AND ASSET:[${mn} TO ${mx}]${sf}&fields=${FIELDS}&sort_by=ASSET&sort_order=DESC&limit=50&offset=0`;
+      const r=await fetch(url);if(!r.ok)throw new Error(`FDIC API ${r.status}`);
+      const j=await r.json();
+      const insts=(j.data||[]).map(x=>x.data);
+      setProg(30);setPhase(`Found ${j.totals?.count||insts.length} banks. Loading history...`);
+      if(!insts.length){setBanks([]);setLoading(false);return;}
+      const bm={};
+      insts.forEach(i=>{bm[i.CERT]={cert:i.CERT,nm:i.INSTNAME,ct:i.CITY,st:i.STALP,as:i.ASSET,roe:i.ROE,roa:i.ROA,t1:i.IDT1RWA||i.RBCRWAJ,q:[parseQ(i)]};});
+      const certs=insts.map(i=>i.CERT);
+      for(let qi=1;qi<DATES.length;qi++){
+        for(let bi=0;bi<certs.length;bi+=25){
+          const batch=certs.slice(bi,bi+25);
+          const cf=batch.map(c=>`CERT:${c}`).join(" OR ");
+          try{
+            const hr=await fetch(`${FDIC}/financials?filters=REPDTE:${DATES[qi]} AND (${cf})&fields=${FIELDS}&limit=25&offset=0`);
+            if(hr.ok){const hj=await hr.json();(hj.data||[]).forEach(x=>{const d=x.data;if(bm[d.CERT])bm[d.CERT].q.push(parseQ(d));});}
+          }catch{}
+        }
+        setProg(30+Math.round((qi/(DATES.length-1))*60));
+        setPhase(`Loading ${QLBL[qi]}... (${qi}/${DATES.length-1})`);
+      }
+      const res=Object.values(bm).map(b=>{b.q.sort((a,c)=>(c.date||"").localeCompare(a.date||""));b.ds=score(b);return b;});
+      setProg(100);setPhase("Done.");setBanks(res);
+    }catch(e){setErr(e.message);}finally{setLoading(false);}
+  },[szF,stF,cMin,cMax]);
+
+  useEffect(()=>{run();},[]);
+
+  const filtered=useMemo(()=>{
+    let b=[...banks];
+    if(phF!=="All")b=b.filter(x=>x.ds.ph===phF);
+    if(srch)b=b.filter(x=>x.nm?.toLowerCase().includes(srch.toLowerCase())||x.ct?.toLowerCase().includes(srch.toLowerCase()));
+    b.sort((a,c)=>{
+      let av,bv;
+      switch(sortC){
+        case"name":return sortD==="asc"?(a.nm||"").localeCompare(c.nm||""):(c.nm||"").localeCompare(a.nm||"");
+        case"assets":av=a.as||0;bv=c.as||0;break;
+        case"score":av=a.ds.s;bv=c.ds.s;break;
+        case"npa":av=a.q[0]?.npaR||0;bv=c.q[0]?.npaR||0;break;
+        case"nco":av=a.q[0]?.ncoR||0;bv=c.q[0]?.ncoR||0;break;
+        case"texas":av=a.q[0]?.texR||0;bv=c.q[0]?.texR||0;break;
+        case"signals":av=a.ds.sig.length;bv=c.ds.sig.length;break;
+        default:av=a.ds.s;bv=c.ds.s;
+      }
+      return sortD==="asc"?av-bv:bv-av;
+    });
+    return b;
+  },[banks,phF,srch,sortC,sortD]);
+
+  const tSort=useCallback(col=>{
+    if(sortC===col)setSortD(d=>d==="asc"?"desc":"asc");
+    else{setSortC(col);setSortD("desc");}
+  },[sortC]);
+
+  const st=useMemo(()=>({
+    tot:banks.length,
+    crit:banks.filter(b=>b.ds.s>=70).length,
+    str:banks.filter(b=>b.ds.s>=50&&b.ds.s<70).length,
+    wtc:banks.filter(b=>b.ds.s>=30&&b.ds.s<50).length,
+    avgNPA:banks.length?+(banks.reduce((s,b)=>s+(b.q[0]?.npaR||0),0)/banks.length).toFixed(2):0,
+    sigs:banks.reduce((s,b)=>s+b.ds.sig.length,0),
+  }),[banks]);
+
+  const SI=({col})=>sortC!==col
+    ?React.createElement("span",{style:{color:"#d1d5db",marginLeft:2}},"↕")
+    :React.createElement("span",{style:{color:"#2563eb",marginLeft:2}},sortD==="asc"?"↑":"↓");
+
+  return React.createElement("div",{className:"app"},
+    // Header
+    React.createElement("div",{className:"header"},
+      React.createElement("div",{className:"header-row"},
+        React.createElement("div",{className:"header-bar"}),
+        React.createElement("h1",null,"Bank NPL Concentration Monitor")
+      ),
+      React.createElement("p",null,"Live FDIC Call Report Data · Quarterly Distress Screening · Deal Sourcing Intelligence")
+    ),
+    // Controls
+    React.createElement("div",{className:"controls"},
+      React.createElement("div",{className:"controls-row"},
+        React.createElement("div",{className:"ctrl-group"},
+          React.createElement("label",null,"State"),
+          React.createElement("select",{value:stF,onChange:e=>setStF(e.target.value)},
+            React.createElement("option",{value:"All"},"All States"),
+            STATES.map(s=>React.createElement("option",{key:s,value:s},s))
+          )
+        ),
+        React.createElement("div",{className:"ctrl-group"},
+          React.createElement("label",null,"Size Tier"),
+          React.createElement("select",{value:szF,onChange:e=>setSzF(e.target.value),style:{minWidth:180}},
+            Object.entries(SIZES).map(([k,v])=>React.createElement("option",{key:k,value:k},v.label))
+          )
+        ),
+        szF==="custom"&&React.createElement("div",{className:"ctrl-group"},
+          React.createElement("label",null,"Min ($K)"),
+          React.createElement("input",{value:cMin,onChange:e=>setCMin(e.target.value),style:{width:100}})
+        ),
+        szF==="custom"&&React.createElement("div",{className:"ctrl-group"},
+          React.createElement("label",null,"Max ($K)"),
+          React.createElement("input",{value:cMax,onChange:e=>setCMax(e.target.value),style:{width:100}})
+        ),
+        React.createElement("button",{className:"btn",onClick:run,disabled:loading},loading?"Loading...":"Screen Banks")
+      )
+    ),
+    // Loading
+    loading&&React.createElement("div",{className:"loading-box"},
+      React.createElement("div",{className:"load-header"},
+        React.createElement("span",null,phase),React.createElement("span",null,`${prog}%`)
+      ),
+      React.createElement("div",{className:"load-track"},
+        React.createElement("div",{className:"load-fill",style:{width:`${prog}%`}})
+      ),
+      React.createElement("div",{className:"load-sub"},"Pulling live data from FDIC BankFind API (banks.data.fdic.gov)...")
+    ),
+    // Error
+    err&&React.createElement("div",{className:"error-box"},
+      React.createElement("strong",null,"API Error: "),err,". Try again or adjust parameters."
+    ),
+    // Stats
+    !loading&&banks.length>0&&React.createElement("div",{className:"stats-grid"},
+      [{l:"Banks Screened",v:st.tot,c:"#374151"},{l:"Critical / Selling",v:st.crit,c:"#dc2626"},{l:"Stress Emerging",v:st.str,c:"#f59e0b"},{l:"Early Watch",v:st.wtc,c:"#3b82f6"},{l:"Avg NPA Ratio",v:st.avgNPA+"%",c:"#8b5cf6"},{l:"Active Signals",v:st.sigs,c:"#ec4899"}]
+      .map(s=>React.createElement("div",{key:s.l,className:"stat-card"},
+        React.createElement("div",{className:"stat-label"},s.l),
+        React.createElement("div",{className:"stat-value",style:{color:s.c}},s.v)
+      ))
+    ),
+    // Filters
+    banks.length>0&&React.createElement("div",{className:"filters-row"},
+      React.createElement("input",{value:srch,onChange:e=>setSrch(e.target.value),placeholder:"Filter by name or city...",style:{width:200}}),
+      React.createElement("select",{value:phF,onChange:e=>setPhF(e.target.value)},
+        ["All","Likely Selling / Workout Active","Stress Emerging","Early Watch","Performing"].map(p=>React.createElement("option",{key:p,value:p},p==="All"?"All Phases":p))
+      ),
+      React.createElement("span",{className:"count"},`${filtered.length} banks · FDIC Call Reports · ${QLBL[0]}`)
+    ),
+    // Table
+    banks.length>0&&React.createElement("div",{className:"table-wrap"},
+      React.createElement("table",null,
+        React.createElement("thead",null,
+          React.createElement("tr",null,
+            React.createElement("th",{onClick:()=>tSort("name")},"Institution ",React.createElement(SI,{col:"name"})),
+            React.createElement("th",null,"Location"),
+            React.createElement("th",{onClick:()=>tSort("assets")},"Assets ",React.createElement(SI,{col:"assets"})),
+            React.createElement("th",{onClick:()=>tSort("score")},"Score ",React.createElement(SI,{col:"score"})),
+            React.createElement("th",null,"Phase"),
+            React.createElement("th",{onClick:()=>tSort("npa")},"NPA% ",React.createElement(SI,{col:"npa"})),
+            React.createElement("th",{onClick:()=>tSort("nco")},"NCO% ",React.createElement(SI,{col:"nco"})),
+            React.createElement("th",{onClick:()=>tSort("texas")},"Texas ",React.createElement(SI,{col:"texas"})),
+            React.createElement("th",{style:{textAlign:"center"}},"Trend"),
+            React.createElement("th",{onClick:()=>tSort("signals")},"Sig ",React.createElement(SI,{col:"signals"}))
+          )
+        ),
+        React.createElement("tbody",null,
+          filtered.map(b=>{
+            const L=b.q[0]||{};const d=b.ds;const isSel=sel?.cert===b.cert;
+            return React.createElement("tr",{key:b.cert,className:isSel?"selected":"",onClick:()=>setSel(isSel?null:b)},
+              React.createElement("td",{style:{fontWeight:600}},
+                React.createElement("div",{style:{fontSize:12}},b.nm),
+                React.createElement("div",{style:{fontSize:10,color:"#9ca3af"}},"#"+b.cert)
+              ),
+              React.createElement("td",{style:{fontSize:11}},`${b.ct}, ${b.st}`),
+              React.createElement("td",{style:{fontSize:11}},fB(b.as)),
+              React.createElement("td",null,React.createElement(ScoreBar,{sc:d.s})),
+              React.createElement("td",null,React.createElement(Badge,{phase:d.ph,small:true})),
+              React.createElement("td",{style:{fontWeight:600,color:(L.npaR||0)>3?"#dc2626":"#374151"}},fP(L.npaR)),
+              React.createElement("td",{style:{color:(L.ncoR||0)>0.8?"#dc2626":"#374151"}},fP(L.ncoR)),
+              React.createElement("td",{style:{color:(L.texR||0)>50?"#dc2626":"#374151"}},L.texR!=null?`${fm(L.texR,0)}%`:"—"),
+              React.createElement("td",{style:{textAlign:"center"}},React.createElement(Spark,{data:b.q.map(q=>q.npaR),color:d.s>=70?"#dc2626":d.s>=50?"#f59e0b":"#3b82f6"})),
+              React.createElement("td",{style:{textAlign:"center"}},
+                React.createElement("span",{style:{fontSize:11,fontWeight:700,color:d.sig.length>3?"#dc2626":d.sig.length>1?"#f59e0b":"#6b7280"}},d.sig.length)
+              )
+            );
+          })
+        )
+      )
+    ),
+    // Empty state
+    !loading&&banks.length===0&&!err&&React.createElement("div",{className:"empty"},
+      React.createElement("div",{className:"empty-icon"},"🏦"),
+      React.createElement("div",{className:"empty-text"},"No results. Adjust parameters and click Screen Banks.")
+    ),
+    // Detail Panel
+    sel&&React.createElement(Detail,{bank:sel,onClose:()=>setSel(null)}),
+    // Footer
+    React.createElement("div",{className:"footer"},
+      React.createElement("strong",null,"Source: "),"FDIC BankFind Suite API (banks.data.fdic.gov) — Schedules RC-N, RC-O, RI-B, RC-R. Distress scores composited from NPA/Assets, NCO/Avg Loans, Texas Ratio, Classified/Capital, and provision trends. Not investment advice."
+    )
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+</script>
+</body>
+</html>
